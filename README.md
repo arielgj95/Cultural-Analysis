@@ -1,2 +1,2 @@
 # Cultural-Analysis
-Classification applied to different datasets to retrive cultural-dependent features
+Classification applied to different datasets to discover cultural-dependent features
