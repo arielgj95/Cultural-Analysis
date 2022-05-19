@@ -27,7 +27,7 @@ def counter(word,data):
 
 np.set_printoptions(threshold=sys.maxsize)
 
-os.chdir(r"C:\Users\ariel\Documents\PHD\Datasets\whats-cooking\train.json")
+os.chdir(r"C:\Users\ariel\Documents\GitHub\Cultural-Analysis\Datasets\whats-cooking\train.json")
 file = "train.json"
 
 with open(file,"r") as f:
