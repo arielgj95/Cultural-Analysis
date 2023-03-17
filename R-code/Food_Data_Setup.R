@@ -23,7 +23,8 @@ X_names <- c("tomato", "corn", "rice", "broth", "beans", "carrots", "avocado",
              "cucumber", "steak", "loin", "zucchini", "ham", "toast", "sirloin",
              "turkey", "lamb", "chips", "broccoli", "spaghetti", "kalamata",
              "pineapple", "asparagus", "mango", "baguette", "salad", "stew",
-             "penne", "cauliflower", "salmon", "lentils", "basmati")
+             "penne", "cauliflower", "salmon", "lentils", "basmati","olive oil", 
+             "salt","pepper","yeast","flour","onions","vinegar","butter")
 
 Y_names <- c("sugar", "salt", "butter", "peanut", "olive oil", "chicken", "veal", "pork")
 
@@ -52,7 +53,7 @@ transform_data <- function(data){
 
 
 ## Data loading
-setwd("C:/Users/ariel/Documents/GitHub/Cultural-Analysis/Datasets/whats-cooking/train.json")
+setwd("C:/Users/ariel/Documents/GitHub/Datasets/whats-cooking/train.json")
 data <- fromJSON("train.json")
 ## Obtaining and saving new data
 final_data <- transform_data(data)

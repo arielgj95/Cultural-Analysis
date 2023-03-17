@@ -17,8 +17,8 @@ library(data.table)
 
 
 no_cores <- detectCores()  # Number of cores
-cl<-makeCluster(no_cores) #4
-registerDoParallel(cl)
+#cl<-makeCluster(no_cores) #4
+#registerDoParallel(cl)
 
 ###### Workspace initialization
 rm(list=ls())
@@ -63,8 +63,8 @@ encode_OneHot <- function(x,name=NULL){
 }
 
 
-normalization <- function(data, norm_type, conc=FALSE){
-  
+normalization <- function(data, norm_type, conc=FALSE){   #conc=TRUE is used to output more columns than input and then concatenate these columns to the data.
+                                                          #if FALSE, the normalization function outputs as many columns as inputs, but this time they are normalized
   for(i in 1:ncol(data)){                   #normalize all the columns (in this case there are 3 columns to be normalized)
     colname <- colnames(data)[[i]]
     if(!conc){
@@ -89,8 +89,8 @@ normalization <- function(data, norm_type, conc=FALSE){
 
 
 read_data_food <- function(data, country1, country2){              ### This function is the only one that depends from dataset
-  
-  len_x_col <- 50
+  #print(head(data[,c(59:67)]))
+  len_x_col <- 58
   len_y_col <- 8
   data <- na.omit(data)                                                                         #remove all data with empty cells
   #print(colnames(data))
@@ -104,11 +104,30 @@ read_data_food <- function(data, country1, country2){              ### This func
 
   data_country1 <- select(filter(data, cuisine == country1),-cuisine)                            #take the data of one country
   data_country2 <- select(filter(data, cuisine == country2),-cuisine)                            #take the data of the other country
-  #print(head(data_country1,10))
   
   return(list("data"=data,"data_country1"=data_country1,"data_country2"=data_country2))
 }
 
+
+data_loans_analysis <- function(data){
+  
+  all_perc <- rep(0,nrow(data))
+  for(i in 1:nrow(data)){
+    perc <- data[i,'funded_amount'] / data[i,'loan_amount']
+    all_perc[i] <- perc
+  }
+  step <- 5
+  names <- rep('',100/step)
+  counts <- rep(0,100/step)
+  for(f in seq(0, 95, step)){
+    names[[(f+step)/step]] <- paste(f,"-",f+5)
+    if(f==0)
+      counts[[(f+step)/step]] <- sum(all_perc>-1 & all_perc<=(f+5)/100)
+    else
+      counts[[(f+step)/step]] <- sum(all_perc>f/100 & all_perc<=(f+5)/100)
+  }
+  
+}
 
 read_data_loans <- function(data, country1, country2, normalize=TRUE, norm_fun=normalization){              ### This function is the only one that depends from dataset
   
@@ -129,15 +148,25 @@ read_data_loans <- function(data, country1, country2, normalize=TRUE, norm_fun=n
     else
       female_borr[[i]] <- 0
   }
+  print(length(which(data['funded_amount'] >= data['loan_amount'])))
+  print(length(which(data['funded_amount'] == data['loan_amount'])))
+  print(length(which(data['funded_amount'] > data['loan_amount'])))
+  print(length(which(data['funded_amount'] < data['loan_amount'])))
+  
   data <- cbind(data, male_borrowers = male_borr)
   data <- cbind(data, female_borrowers = female_borr)
   data <- subset(data, select = -borrower_genders)
   data <- filter(data, country == country1 | country == country2)
   data$country <- factor(data$country)                                          #from string to factor variables
-  
-  is_funded <- ifelse(data['funded_amount'] >= data['loan_amount'],1,0) # add a column called is_founded which is 1 if 'funded_amount' = 'loan_amount', 0 otherwise
+
+  is_funded <- ifelse(data['funded_amount'] == data['loan_amount'],1,0) # add a column called is_founded which is 1 if 'funded_amount' = 'loan_amount', 0 otherwise
   colnames(is_funded) <- "is_funded"
-  data <- cbind(data, is_funded = is_funded)  
+  data <- cbind(data, is_funded = is_funded)
+  print(length(data[[1]]))
+  #print(head(data,100))
+  #print(head(data[data["is_funded"] == 1],100))
+  print(length(which(data["is_funded"] == 1)))
+  print(length(which(data["is_funded"] == 0)))
   data[,"is_funded"] <- ifelse(data[,"is_funded"] == 1,"Funded","Not Funded")  #transform to factor variable
   data[,"is_funded"] <- factor(data[,"is_funded"]) #from string to factor variables
   
@@ -150,6 +179,8 @@ read_data_loans <- function(data, country1, country2, normalize=TRUE, norm_fun=n
     data <- subset(data, select = -c(activity,partner_id,repayment_interval,sector,currency))
   }
   data_country1 <- select(filter(data, country == country1),-country)                            #take the data of one country
+  print(colnames(data_country1))
+  print(ncol(data_country1))
   data_country2 <- select(filter(data, country == country2),-country)                            #take the data of the other country
   #print(head(data_country1,10))
   
@@ -157,7 +188,7 @@ read_data_loans <- function(data, country1, country2, normalize=TRUE, norm_fun=n
 }
 
 
-extract_sets <- function(data, n_tr, n_val){
+extract_sets <- function(data, n_tr, n_val,country){
 
   samp <- sample(nrow(data), n_tr + n_val)                    #sample random rows of the dataset for training and validation
   #build training,validation and test sets 
@@ -167,6 +198,23 @@ extract_sets <- function(data, n_tr, n_val){
   YTr <- data[samp[1:n_tr], c(1)]
   YVal <- data[samp[(n_tr+1):(n_tr + n_val)], c(1)]
   YTe <- data[-samp, c(1)]
+  #print(head(XTr))
+  ##path <- "C:/Users/ariel/Documents/GitHub/Datasets/whats-cooking/train.json"
+  ##setwd(file.path(path, "results"))
+  #print(YTr)
+  ##data_out <- rbind(cbind(XTr, sugar=YTr), cbind(XVal, sugar=YVal), cbind(XTe, sugar=YTe))
+  #print(dim(data_out))
+  #print(head(data_out))
+  
+  ###write.csv(data_out,paste("All_data_",country,".csv",sep=""), row.names = FALSE)
+  #write.csv(rbind(XTr,XVal,XTe),paste("All_data",country,".csv",sep=""), row.names = FALSE)
+  #write(XTr, paste("Jdata_rf_",country,"VS",countries[[2]],"_",Y_names[[1]],".json",sep = ""))
+  
+  #print("TE DATA")
+  #print(length(which(XTe['funded_amount'] >= XTe['loan_amount'])))
+  #print(length(which(XTe['funded_amount'] == XTe['loan_amount'])))
+  #print(length(which(XTe['funded_amount'] > XTe['loan_amount'])))
+  #print(length(which(XTe['funded_amount'] < XTe['loan_amount'])))
   
   return(list("XTr"=XTr,"XVal"=XVal,"XTe"=XTe,
               "YTr"=YTr, "YVal"=YVal, "YTe"=YTe))
@@ -215,12 +263,14 @@ choose_TrValTe_sets <- function(model, data1, data2, all_models){   #depending o
 }
 
 
-rf_model <- function(xtr, ytr, xte1, xte2, n_trees, mtry){
+rf_model <- function(xtr, ytr, xte1, xte2, n_trees, mtry,yt1,yt2,model_name,type){
   
   
-  cl<-makePSOCKcluster(6)
+  #cl<-makePSOCKcluster(6)
   
-  registerDoParallel(cl)
+  #registerDoParallel(cl)
+  
+  #unb_fact <- table(c(ytr))[[class1]]/table(c(ytr))[[class2]]  
   
   #M <- foreach(mtry = mtry_vec, .combine=randomForest::combine,
   #              .multicombine=TRUE, .packages='randomForest') %dopar% {
@@ -228,27 +278,54 @@ rf_model <- function(xtr, ytr, xte1, xte2, n_trees, mtry){
   #                             sampsize = c(min(summary(ytr)),min(summary(ytr))),
   #                             mtry = mtry_vec)
   #              }
-  M <- prandomForest(x = xtr, y = ytr, importance = TRUE, ntree = n_trees,       #build the random forest model and train it using the tr_data and tuple of params
+  #print(paste("***TYPE:",type,"***"))
+  #print(paste("Mtry:",mtry))
+  #mtry=8
+  #print(paste("Summary:",c(min(summary(ytr)),min(summary(ytr)))))
+  M <- randomForest(x = xtr, y = ytr, ntree = n_trees,       #build the random forest model and train it using the tr_data and tuple of params
                     sampsize = c(min(summary(ytr)),min(summary(ytr))),
                     mtry = mtry)
+     
+  
+  #M <- randomForest(x = xtr, y = ytr, ntree = n_trees,       #build the random forest model and train it using the tr_data and tuple of params
+  #                  mtry = mtry)
   
   #compute predictions and probabilities
   Y1 <- predict(M,xte1)
   Y2 <- predict(M,xte2)
+  #print(dim(xte1))
+  conf_mat1 <- table(Y1,yt1)
+  conf_mat2 <- table(Y2,yt2)
+  #print(yt1)
+  #print(Y1)
+  #print(conf_mat1)
+  #print(paste(model_name,"model tested with italian data"))
+  cf1=confusionMatrix(data = Y1, reference = yt1)
+  #print(cf1)
+  #print(conf_mat2)
+  #print(paste(model_name,"model tested with chinese data"))
+  cf2=confusionMatrix(data = Y2, reference = yt2)
+  #print(cf2)
+  #print(paste("sensitivity of",model_name,"model tested with italian data"))
+  #print(bal_accuracy(conf_mat1))
+  #print(paste("sensitivity of",model_name,"model tested with chinese data"))
+  #print(sensitivity(conf_mat2))
   Y1_prob <- as.data.frame(predict(M,xte1, type = "prob")) 
   Y2_prob <- as.data.frame(predict(M,xte2, type = "prob")) 
   
-  stopCluster(cl)
+  #stopCluster(cl)
   return(list("res1"=Y1,"res2"=Y2,"res1_prob"=Y1_prob, "res2_prob"=Y2_prob))
 }
 
 
-svm_model <- function(xtr,ytr,xte1,xte2,gamma,cost,class1,class2){
-  
-  unb_fact <- table(c(ytr))[[class1]]/table(c(ytr))[[class2]]                #compute unbalance between classes 
-  M <- svm(x = xtr, y = ytr, kernel = "radial",                                 #build the svm model and train it using the tr_data and tuple of params
-           gamma = gamma, cost = cost,
-           probability=TRUE, class.weights = c(class1=1/(1+unb_fact),class2=1-(1/(1+unb_fact))))    ######Savory then Sweet
+svm_model <- function(xtr,ytr,xte1,xte2,gamma,cost,cl1,cl2){
+
+  #unb_fact <- table(c(ytr))[[cl1]]/table(c(ytr))[[cl2]]                #compute unbalance between classes 
+  #print(c(class1=1/(1+unb_fact),class2=1-(1/(1+unb_fact))))
+  #build the svm model and train it using the tr_data and tuple of params
+  print("called")
+  M <- svm(x = xtr, y = ytr, kernel = "radial", gamma = gamma, 
+           cost = cost, probability=TRUE, class.weights = "inverse")   
   #compute predictions and probabilities
   Y1 <- predict(M,xte1)
   Y2 <- predict(M,xte2)
@@ -324,44 +401,48 @@ put_data <- function(res, data, Y1, Y2, it, idx, classes){                      
 
 
 ##########  Values initialization
-#countries <- c("italian","chinese")
-countries <- c("Philippines","Kenya")
+countries <- c("indian","italian")
+#countries <- c("Philippines","Kenya")
+Y_names <- c("sugar")
 #Y_names <- c("sugar", "salt", "butter", "peanut", "olive oil", "chicken", "veal", "pork")
-Y_names <- c("funded")
-n_loops <- 1        #number of times the experiment is repeated and dataset splitted
+#Y_names <- c("funded")
+n_loops <- 5        #number of times the experiment is repeated and dataset splitted
 n_bstrap <- 500   #number of bootstrap samples used for avg and std of AUC
 n_trees <- 1000   #number f trees random forest
-n_tr_val <- 60000   #training + validation samples
+n_tr_val <- 1000   #training + validation samples
 p <- .9           #90% of training and 10 of validation
 n_tr <- as.integer(n_tr_val * p)
 n_val <- n_tr_val - as.integer(n_tr_val * p)
-models <- c(countries[[1]], countries[[2]], paste(countries[[1]],"+",countries[[2]]), paste(countries[[1]],"+",countries[[2]],"+ CountLabel")) #name of the models used    
-#classes <- c("Present", "Not Present")                                          #name of the classes
-classes <- c("Funded","Not Funded")    
+models <- c(countries[[1]], countries[[2]], paste(countries[[1]],"+",countries[[2]]), paste(countries[[1]],"+",countries[[2]],"+ CountryLabel")) #name of the models used    
+classes <- c("Present", "Not Present")                                          #name of the classes
+#classes <- c("Funded","Not Funded")    
 All_models_vals <- vector(mode = 'list', length = length(models))               #this list contains all the values needed for the evaluation
 names(All_models_vals) <- models
 
 
-#path <- "C:/Users/ariel/Documents/GitHub/Cultural-Analysis/Datasets/whats-cooking/train.json"
-path <- "C:/Users/ariel/Documents/GitHub/Cultural-Analysis/Datasets/kiva_loans.csv"
+path <- "C:/Users/ariel/Documents/GitHub/Datasets/whats-cooking/train.json"
+#path <- "C:/Users/ariel/Documents/GitHub/Datasets/kiva_loans.csv"
 setwd(path)
-#data <- read.csv("food_dataset.csv", sep = ',')     
-data <- read.csv("kiva_loans.csv", sep = ',') 
-#all_data <- read_data_food(data, country1 = countries[[1]], country2 = countries[[2]])
-all_data <- read_data_loans(data, country1 = countries[[1]], country2 = countries[[2]])
-
-x_col=c(1:6,8:ncol(all_data[["data_country1"]]))
-y_col=7
+data <- read.csv("food_dataset.csv", sep = ',')     
+print("data read")
+#data <- read.csv("kiva_loans.csv", sep = ',') 
+all_data <- read_data_food(data, country1 = countries[[1]], country2 = countries[[2]])
+#all_data <- read_data_loans(data, country1 = countries[[1]], country2 = countries[[2]])
+#(head(data,10))
+x_col=c(1:58)
+y_col=59
+#x_col=c(1:6,8:ncol(all_data[["data_country1"]]))
+#y_col=7
 
 ######### Tuples of parameters for each model
 ## SVM
 C_svm <- sapply(seq(-4+7/25,3,7/25), function(x) 10^x)
 gamma_svm <- sapply(seq(-4+7/25,3,7/25), function(x) 10^x)
-#weigth_svm <- sapply(seq(0+1/20,1,1/20), function(x) list(c("Savory"=x,"Sweet"=1-x)))
+#weigth_svm <- sapply(seq(0+1/20,1,1/20),F function(x) list(c("Savory"=x,"Sweet"=1-x)))
 svm_param <- list(cost = C_svm, gamma = gamma_svm)#, class.weights = weigth_svm)
 
 ## RF
-mtry <- c(1, 2, 4, 5, 6, 8, 10, 12, 15, 18, 20, 24)
+mtry <- c(1, 2, 4, 5, 6, 8, 10, 12, 15, 18, 20)
 rf_param <- list(.mtry = mtry)
 
 
@@ -374,8 +455,11 @@ for(pred in y_col){ #for each Y
     
     ###### Extract the training,validation,test sets
     while(TRUE){
-      data_country1 <- extract_sets(all_data[["data_country1"]][,c(pred,x_col)],n_tr,n_val) #they contain XTr, XVal, XTe, YTr, YVal, YTe
-      data_country2 <- extract_sets(all_data[["data_country2"]][,c(pred,x_col)],n_tr,n_val)
+      #print(head(all_data[["data_country1"]][,c(pred,x_col)]))
+      data_country1 <- extract_sets(all_data[["data_country1"]][,c(pred,x_col)],n_tr,n_val,countries[[1]]) #they contain XTr, XVal, XTe, YTr, YVal, YTe
+      data_country2 <- extract_sets(all_data[["data_country2"]][,c(pred,x_col)],n_tr,n_val,countries[[2]])
+      #print(head(data_country1[['YTr']]))
+      #print(head(data_country1[['XTr']]))
       #table(data_western[['YTr']])[['Food']]
       # To avoid problems in the training phase, it must be insured that at least one sample of each class is present inside the training set
       if(table(data_country1[['YTr']])[[classes[[1]]]] != 0 && table(data_country1[['YTr']])[[classes[[2]]]] != 0 &&
@@ -390,15 +474,18 @@ for(pred in y_col){ #for each Y
         sets <- choose_TrValTe_sets(models[[j]], data_country1, data_country2, models)  #it contains XTr,XVal,XTe_As,XTe_We,YTr,YVal used for the specific models
         if(FALSE){
           val_results <- svm_model(sets[["XTr"]], sets[["YTr"]], sets[["XVal1"]],sets[["XVal2"]],
-                                   model_grid[[par,'gamma']],model_grid[[par,'cost']])
+                                   model_grid[[par,'gamma']],model_grid[[par,'cost']],classes[[1]],classes[[2]])
           te_results <- svm_model(rbind(sets[["XTr"]],sets[["XVal"]]), c(as.array(sets[["YTr"]]),as.array(sets[["YVal"]])), sets[["XTe1"]], sets[["XTe2"]],
-                                  model_grid[[par,'gamma']],model_grid[[par,'cost']])}
-        
+                                  model_grid[[par,'gamma']],model_grid[[par,'cost']],classes[[1]],classes[[2]])
+          }
+      
         val_results <- rf_model(sets[["XTr"]], sets[["YTr"]], sets[["XVal1"]],sets[["XVal2"]],
-                                n_trees, model_grid[[par,'.mtry']])
+                                n_trees, model_grid[[par,'.mtry']],data_country1[["YVal"]],data_country2[["YVal"]],models[[j]],"val")  #####
+        #te_results <- rf_model(rbind(sets[["XTr"]],sets[["XVal"]]), c(as.array(sets[["YTr"]]),as.array(sets[["YVal"]])), sets[["XTe1"]], sets[["XTe2"]],
+         #                      n_trees, model_grid[[par,'.mtry']],data_country1[["YTe"]],data_country2[["YTe"]])   #####
         te_results <- rf_model(rbind(sets[["XTr"]],sets[["XVal"]]), c(as.array(sets[["YTr"]]),as.array(sets[["YVal"]])), sets[["XTe1"]], sets[["XTe2"]],
-                               n_trees, model_grid[[par,'.mtry']])
-        
+                              n_trees, model_grid[[par,'.mtry']] ,data_country1[["YTe"]],data_country2[["YTe"]],models[[j]],"te")   #####
+      
         if(i==1){ 
           All_models_vals[[j]] <- init_final_data(val_results,te_results,data_country1[["YVal"]],data_country2[["YVal"]],
                                                   data_country1[["YTe"]],data_country2[["YTe"]],n_loops,

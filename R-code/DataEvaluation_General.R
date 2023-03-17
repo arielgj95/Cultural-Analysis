@@ -80,22 +80,21 @@ validation_data <- function(model,data,all_models){
   return(list(y_true,y_pred))
 }
 
-saving_path <- "C:/Users/ariel/Documents/GitHub/Cultural-Analysis/Datasets/kiva_loans.csv/results"
-rocs_path <- "plots/rocs"
-cf_path <- "plots/cf"
-res_path <- "plots/all_res"
+saving_path <- "C:/Users/ariel/Documents/PHD/GitHub/Datasets/whats-cooking/train.json/results"
 setwd(saving_path)
-countries <- c("Philippines","Kenya")
+#countries <- c("Philippines","Kenya")
+countries <- c("thai","cajun_creole")
 #models <- c("italian", "chinese", "italian + chinese", "italian + chinese + CuisLabel")
-models <- c(countries[[1]], countries[[2]], paste(countries[[1]],"+",countries[[2]]), paste(countries[[1]],"+",countries[[2]],"+ CountLabel")) #name of the models used  
+models <- c(countries[[1]], countries[[2]], paste(countries[[1]],"+",countries[[2]]), paste(countries[[1]],"+",countries[[2]],"+ CountryLabel")) #name of the models used  
+models_name <- c(countries[[1]], countries[[2]], paste(countries[[1]],"+",countries[[2]],sep=""), paste(countries[[1]],"+",countries[[2]],"+cuisine"),sep="") 
 #models_plot <- c("italian", "thai", "italian + thai") ##it's specific of the dataset, useful for plots
-#countries <- c("italian","chinese")
-#classes <- c("Present", "Not Present")
-classes <- c("Funded","Not Funded")  
+classes <- c("Present", "Not Present")
+#classes <- c("Funded","Not Funded")  
 #d_type <- c('As','We')
 n_bstrap <- 500
 #Y_names <- c("sugar", "salt", "butter", "peanut", "olive oil", "chicken", "veal", "pork")
-Y_names <- c("funded")
+#Y_names <- c("funded")
+Y_names <- c("sugar")
 pred <- Y_names[[1]]
 
 
@@ -113,10 +112,13 @@ data <- fromJSON(paste("Jdata_rf_",countries[[1]],"vs",countries[[2]],"_",pred,"
 print("Data loaded")
 
 ##create the outputs folder if they do not exist
-dir.create(file.path(saving_path,"plots"), showWarnings = FALSE)
-dir.create(file.path(saving_path, rocs_path), showWarnings = FALSE)  
-dir.create(file.path(saving_path, cf_path), showWarnings = FALSE)  
-dir.create(file.path(saving_path, res_path), showWarnings = FALSE)  
+rocs_path <- paste("plots/rocs/",countries[[1]],"VS",countries[[2]],sep="")
+cf_path <- paste("plots/cf/",countries[[1]],"VS",countries[[2]], "/",pred,sep="")
+res_path <- paste("plots/all_res/",countries[[1]],"VS",countries[[2]],"/",pred,sep="")
+#dir.create(file.path(saving_path,"plots"), showWarnings = FALSE)
+dir.create(file.path(saving_path, rocs_path), showWarnings = FALSE, recursive=TRUE)  
+dir.create(file.path(saving_path, cf_path), showWarnings = FALSE, recursive=TRUE)  
+dir.create(file.path(saving_path, res_path), showWarnings = FALSE, recursive=TRUE)  
 
 
 for(s in 1:length(scores)){
@@ -198,7 +200,7 @@ for(s in 1:length(scores)){
                                 + theme_bw()
                                 + geom_abline(intercept = 100, slope = 1, colour = "green", size = 0.4, linetype = 2)
                                 + annotate(geom="text", x=18, y=10, label=ac, colour = "blue")
-                                + ggtitle(paste("ROC of", m,"model \n tested with", countries[type],"data"))
+                                + ggtitle(paste("ROC of", models_name[[match(m,models)]],"model \n tested with", countries[type],"data"))  ###m where there is match
                                 #+ xlab="False Positive Percentage" + ylab="True Postive Percentage"
                                 + theme(panel.background = element_blank(),
                                         axis.line = element_line(colour = "black"),
@@ -227,7 +229,7 @@ for(s in 1:length(scores)){
                                      scale_y_discrete(limits=rev) +
                                      scale_x_discrete(position = "top") +
                                      guides(fill="none") +
-                                     ggtitle(paste("CM of", m,"model \n tested with", countries[type],"data")) +
+                                     ggtitle(paste("CM of",models_name[[match(m,models)]],"model \n tested with", countries[type],"data")) +
                                      theme(plot.title = element_text(hjust = 0.5, lineheight=.8, colour = 'red')),list(it = it)))
         
         if(type==1)
@@ -241,18 +243,18 @@ for(s in 1:length(scores)){
   }
   if(names(scores)[s]!='AUC'){
     all_cm_plot <- grid.arrange(grobs = c(country1_plots,country2_plots), nrow=2, ncol=length(models),
-                                top=textGrob(paste("Confusion Matrices",pred,sep=""),gp=gpar(fontsize=26,color = "steelblue",font=1)))
+                                top=textGrob(paste("Confusion Matrices_",pred,sep=""),gp=gpar(fontsize=26,color = "steelblue",font=1)))
     #print(all_cm_plot)
     ggsave(paste("conf_matrices_rf_ValTe_",pred,"_",countries[[1]],"VS",countries[[2]],"_",names(scores)[s],".png",sep=""), plot = all_cm_plot, device = png(width=300*length(models), height = 600), 
            path = file.path(saving_path, cf_path))
   }
   else{
     all_roc_plot <- grid.arrange(grobs = c(country1_rocs,country2_rocs), nrow=2, ncol=length(models),
-                                 top=textGrob(paste("ROCs",pred),gp=gpar(fontsize=26,colour = "steelblue",font=1)))
+                                 top=textGrob(paste("ROCs_",pred),gp=gpar(fontsize=26,colour = "steelblue",font=1)))
     
     ggsave(paste("rocs_rf_ValTe_",pred,"_",countries[[1]],"VS",countries[[2]],".png",sep=""), plot = all_roc_plot, device = png(width=300*length(models), height = 600), 
-           path = file.path(saving_path, rocs_path))
+           path = file.path(saving_path, rocs_path))#, paste(countries[[1]],"VS",countries[[2]],sep="")))
   }
   Jdata <- toJSON(results)
-  write(Jdata, paste(file.path(saving_path, rocs_path),"/",names(scores)[s],"_rf_ValTe_",pred,"_",countries[[1]],"VS",countries[[2]],".json",sep=""))
+  write(Jdata, paste(file.path(saving_path, res_path),"/",names(scores)[s],"_rf_ValTe_",pred,"_",countries[[1]],"VS",countries[[2]],".json",sep=""))
 }
